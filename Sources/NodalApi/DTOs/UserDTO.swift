@@ -8,26 +8,29 @@
 import Fluent
 import Vapor
 
-struct UserDTO: Content {
-    var id: UUID?
-    var username: String?
-    var email: String?
-    var password: String?
-    var avatarUrl: String?
-    var watchlist: [WatchlistCoinDTO]?
+struct CreateUserDTO: Content {
+    let username: String
+    let email: String
+    let password: String
+    let avatarUrl: String?
     
     func toModel() -> User {
         let model = User()
         
-        model.id = self.id
-        if let username = self.username,
-           let email = self.email,
-           let avatarUrl = self.avatarUrl {
-            model.username = username
-            model.email = email
+        model.username = username
+        model.email = email
+        model.passwordHash = password
+        if let avatarUrl = self.avatarUrl {
             model.avatarUrl = avatarUrl
         }
         
         return model
     }
+}
+
+struct ResponseUserDTO: Content {
+    let username: String
+    let email: String
+    let avatarUrl: String?
+    let watchlist: [WatchlistCoinDTO]
 }

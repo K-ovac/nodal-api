@@ -9,8 +9,10 @@ import Fluent
 import Vapor
 import struct Foundation.UUID
 
-final class User: Model, @unchecked Sendable {
+final class User: Model, ModelAuthenticatable, @unchecked Sendable {
     static let schema: String = "users"
+    static let usernameKey: KeyPath<User, FluentKit.FieldProperty<User, String>> = \.$email
+    static let passwordHashKey: KeyPath<User, FluentKit.FieldProperty<User, String>> = \.$passwordHash
     
     @ID(key: .id)
     var id: UUID?
@@ -46,14 +48,16 @@ final class User: Model, @unchecked Sendable {
         self.avatarUrl = avatarUrl
     }
     
-    func toDTO() -> UserDTO {
+    func toDTO() -> ResponseUserDTO {
         .init(
-            id: self.id,
             username: self.username,
             email: self.email,
-            password: self.passwordHash,
             avatarUrl: self.avatarUrl,
-            watchlist: self.$watchlist.value?.map { $0.toDTO() }
+            watchlist: self.$watchlist.value?.map { $0.toDTO() } ?? []
         )
+    }
+    
+    func verify(password: String) throws -> Bool {
+        try Bcrypt.verify(password, created: self.passwordHash)
     }
 }

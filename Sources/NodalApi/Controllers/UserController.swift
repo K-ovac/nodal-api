@@ -10,43 +10,50 @@ import Vapor
 
 struct UserController: RouteCollection {
     func boot(routes: any RoutesBuilder) throws {
-        let user = routes.grouped("user")
+        let user = routes.grouped("users")
         
-        user.get(use: self.index)
         user.post(use: self.create)
+        user.get(use: self.getMe)
+        user.get(use: self.getUser)
     }
     
     @Sendable
-    func index(req: Request) async throws -> [UserDTO] {
-        try await User.query(on: req.db)
-            .with(\.$watchlist)
-            .all()
-            .map { $0.toDTO() }
-    }
-    
-    @Sendable
-    func create(req: Request) async throws -> UserDTO {
-        let userDTO = try req.content.decode(UserDTO.self)
-        let user = userDTO.toModel()
+    func getMe(_ req: Request) async throws -> ResponseUserDTO {
+        let user = try req.auth.require(User.self)
         
-        if let password = userDTO.password {
-            user.passwordHash = try req.password.hash(password)
+        try await user.$watchlist.load(on: req.db)
+        
+        return user.toDTO()
+    }
+    
+    @Sendable
+    func getUser(_ req: Request) async throws -> ResponseUserDTO {
+        guard let username = req.parameters.get("username") else {
+            throw Abort(.badRequest)
         }
+        
+        guard let user = try await User.query(on: req.db)
+            .filter(\.$username == username)
+            .with(\.$watchlist)
+            .first() else {
+            throw Abort(.notFound)
+        }
+        
+        return user.toDTO()
+    }
+    
+    @Sendable
+    func create(_ req: Request) async throws -> ResponseUserDTO {
+        let userDTO = try req.content.decode(CreateUserDTO.self)
+        let hash = try req.password.hash(userDTO.password)
+        let user = User(
+            username: userDTO.username,
+            email: userDTO.email,
+            passwordHash: userDTO.password,
+            avatarUrl: userDTO.avatarUrl ?? ""
+        )
         
         try await user.save(on: req.db)
-        
-        if let watchlistDTOs = userDTO.watchlist {
-            for dto in watchlistDTOs {
-                let coin = WatchlistCoin(userId: try user.requireID(), coinId: dto.coinId)
-                try await coin.save(on: req.db)
-            }
-        }
-        
-        // Reload to include watchlist
-        return try await User.query(on: req.db)
-            .filter(\.$id == user.requireID())
-            .with(\.$watchlist)
-            .first()
-            .map { $0.toDTO() } ?? user.toDTO()
+        return user.toDTO()
     }
 }

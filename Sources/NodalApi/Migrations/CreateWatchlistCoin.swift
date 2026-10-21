@@ -13,6 +13,7 @@ struct CreateWatchlistCoin: AsyncMigration {
             .id()
             .field("coinId", .string, .required)
             .field("userId", .uuid, .required, .references("users", "id", onDelete: .cascade))
+            .unique(on: "coinId", "userId")
             .create()
     }
     
