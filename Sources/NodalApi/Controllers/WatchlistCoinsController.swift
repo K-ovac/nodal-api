@@ -8,6 +8,8 @@
 import Fluent
 import Vapor
 
+// MARK: - WatchlistCoinsController
+
 struct WatchlistCoinsController: RouteCollection {
     func boot(routes: any Vapor.RoutesBuilder) throws {
         let watchlistCoins = routes.grouped("watchlistCoins")
@@ -18,6 +20,8 @@ struct WatchlistCoinsController: RouteCollection {
         protected.post(":coinId", use: addToWatchlist)
         protected.delete(":coinId", use: removeFromWatchlist)
     }
+    
+    // MARK: - Sendable Methods
     
     @Sendable
     func addToWatchlist(_ req: Request) async throws -> HTTPStatus {

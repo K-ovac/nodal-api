@@ -8,6 +8,8 @@
 import Fluent
 import Vapor
 
+// MARK: - UserController
+
 struct UserController: RouteCollection {
     func boot(routes: any RoutesBuilder) throws {
         let user = routes.grouped("users")
@@ -16,6 +18,8 @@ struct UserController: RouteCollection {
         user.get(use: self.getMe)
         user.get(use: self.getUser)
     }
+    
+    // MARK: - Sendable Methods
     
     @Sendable
     func getMe(_ req: Request) async throws -> ResponseUserDTO {
