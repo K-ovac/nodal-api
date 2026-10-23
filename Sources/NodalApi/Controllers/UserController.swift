@@ -53,7 +53,7 @@ struct UserController: RouteCollection {
         let user = User(
             username: userDTO.username,
             email: userDTO.email,
-            passwordHash: userDTO.password,
+            passwordHash: hash,
             avatarUrl: userDTO.avatarUrl ?? ""
         )
         

@@ -80,10 +80,13 @@ struct MarketController: RouteCollection {
     
     @Sendable
     func fetchTrendingCoins(req: Request) async throws -> TrendingCoinsProviderDTO {
+        let reqCurrency = try? req.query.get(String.self, at: "vs_currency")
+        let currency = reqCurrency ?? "usd"
+        
         return try await fetchAndCache(
             req: req,
             key: .trendingCoins,
-            currency: <#String?#>,
+            currency: currency,
             responseType: TrendingCoinsProviderDTO.self)
     }
     
