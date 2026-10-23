@@ -15,8 +15,8 @@ struct UserController: RouteCollection {
         let user = routes.grouped("users")
         
         user.post(use: self.create)
-        user.get(use: self.getMe)
-        user.get(use: self.getUser)
+        user.get("me", use: self.getMe)
+        user.get(":username", use: self.getUser)
     }
     
     // MARK: - Sendable Methods
