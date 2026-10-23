@@ -17,8 +17,8 @@ struct WatchlistCoinsController: RouteCollection {
         let guardMW = User.guardMiddleware()
         let protected = watchlistCoins.grouped(basicMW, guardMW)
         
-        protected.post(":coinId", use: addToWatchlist)
-        protected.delete(":coinId", use: removeFromWatchlist)
+        protected.post(":coinId", use: self.addToWatchlist)
+        protected.delete(":coinId", use: self.removeFromWatchlist)
     }
     
     // MARK: - Sendable Methods
