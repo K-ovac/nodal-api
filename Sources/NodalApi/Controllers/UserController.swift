@@ -15,8 +15,12 @@ struct UserController: RouteCollection {
         let user = routes.grouped("users")
         
         user.post(use: self.create)
-        user.get("me", use: self.getMe)
         user.get(":username", use: self.getUser)
+        
+        let basicMW = User.authenticator()
+        let guardMW = User.guardMiddleware()
+        let protected = user.grouped(basicMW, guardMW)
+        protected.get("me", use: self.getMe)
     }
     
     // MARK: - Sendable Methods
