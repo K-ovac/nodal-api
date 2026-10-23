@@ -23,24 +23,23 @@ private enum RequestConstants {
         
         var endpoint: String {
             switch self {
-            case .topList: return "coins/markets?vs_currency=usd"
-            case .globalMetrics: return "global?vs_currency=usd"
-            case .trendingCoins: return "search/trending?vs_currency=usd"
+            case .topList: return "coins/markets"
+            case .globalMetrics: return "global"
+            case .trendingCoins: return "search/trending"
             }
         }
         
-        var cacheKey: String { self.rawValue }
+        var id: String { self.rawValue }
     }
     
-    static func url(for endpoint: String) -> String {
-        let endpoint = RequestConstants.Keys(rawValue: endpoint)
+    static func url(for key: Keys, currency: String? = nil) -> String {
+        var url = baseUrl + key.endpoint
         
-        switch endpoint {
-        case .topList: return baseUrl + Keys.topList.endpoint
-        case .globalMetrics: return baseUrl + Keys.globalMetrics.endpoint
-        case .trendingCoins: return baseUrl + Keys.trendingCoins.endpoint
-        default: return baseUrl
-        }
+        guard let currency else { return "usd" }
+        let separator = url.contains("?") ? "&" : "?"
+        url += "\(separator)vs_currency\(currency)"
+        
+        return url
     }
 }
 
@@ -58,9 +57,13 @@ struct MarketController: RouteCollection {
     
     @Sendable
     func fetchTopList(req: Request) async throws -> [TokenListDTO] {
+        let reqCurrency = try? req.query.get(String.self, at: "vs_currency")
+        let currency = reqCurrency ?? "usd"
+        
         return try await fetchAndCache(
             req: req,
-            endpoint: .topList,
+            key: .topList,
+            currency: currency,
             responseType: [TokenListDTO].self
         )
     }
@@ -69,7 +72,8 @@ struct MarketController: RouteCollection {
     func fetchGlobalMetrics(req: Request) async throws -> GlobalMetricsDataDTO {
         return try await fetchAndCache(
             req: req,
-            endpoint: .globalMetrics,
+            key: .globalMetrics,
+            currency: nil,
             responseType: GlobalMetricsDataDTO.self
         )
     }
@@ -78,7 +82,8 @@ struct MarketController: RouteCollection {
     func fetchTrendingCoins(req: Request) async throws -> TrendingCoinsProviderDTO {
         return try await fetchAndCache(
             req: req,
-            endpoint: .trendingCoins,
+            key: .trendingCoins,
+            currency: <#String?#>,
             responseType: TrendingCoinsProviderDTO.self)
     }
     
@@ -86,13 +91,15 @@ struct MarketController: RouteCollection {
     
     private func fetchAndCache<T: Content>(
         req: Request,
-        endpoint: RequestConstants.Keys,
+        key: RequestConstants.Keys,
+        currency: String?,
         responseType: T.Type
     ) async throws -> T {
-        let cacheKey = endpoint.cacheKey
+        let currencyValue = currency != nil ? currency : ""
+        let cacheKey = "\(key.id)_" + String(describing: currencyValue)
         
         if let cachedData = try await req.cache.get(cacheKey, as: T.self) {
-            req.logger.info("Get from cache: \(endpoint.cacheKey)")
+            req.logger.info("Getting from cache: \(key.id)")
             return cachedData
         }
         
@@ -101,11 +108,11 @@ struct MarketController: RouteCollection {
             headers.add(name: RequestConstants.apiHeader, value: apiKey)
         }
         
-        let url = RequestConstants.url(for: endpoint.cacheKey)
+        let url = RequestConstants.url(for: key, currency: currency)
         let response = try await req.client.get(URI(string: url), headers: headers)
         
         guard response.status == .ok else {
-            req.logger.error("Error from Data Agg for \(endpoint.cacheKey): \(response.status)")
+            req.logger.error("Error from Data Agg for \(key.id): \(response.status)")
             
             if response.status == .tooManyRequests {
                 throw Abort(.tooManyRequests, reason: "The external API request limit has been exceeded. Please try again later.")
@@ -122,7 +129,7 @@ struct MarketController: RouteCollection {
             expiresIn: .seconds(RequestConstants.expiresIn)
         )
         
-        req.logger.info("Data downloaded from the API and cached: \(endpoint.cacheKey)")
+        req.logger.info("Data downloaded from the API and cached: \(key.id)")
         return decodedData
     }
 }
