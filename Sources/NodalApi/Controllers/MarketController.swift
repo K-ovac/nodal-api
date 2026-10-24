@@ -20,20 +20,30 @@ private enum RequestConstants {
         case topList
         case globalMetrics
         case trendingCoins
+        case coinMetadata
         
         var endpoint: String {
             switch self {
             case .topList: return "coins/markets"
             case .globalMetrics: return "global"
             case .trendingCoins: return "search/trending"
+            case .coinMetadata: return "coins"
             }
         }
         
         var id: String { self.rawValue }
     }
     
-    static func url(for key: Keys, currency: String? = nil) -> String {
+    static func url(for key: Keys, id: String? = nil, currency: String? = nil) -> String {
         var url = baseUrl + key.endpoint
+        
+        if let id = id, !id.isEmpty {
+            if url.hasSuffix("/") {
+                url += id
+            } else {
+                url += "/\(id)"
+            }
+        }
         
         guard let currency = currency, !currency.isEmpty else { return url }
         let separator = url.contains("?") ? "&" : "?"
@@ -51,6 +61,7 @@ struct MarketController: RouteCollection {
         market.get("top", use: self.fetchTopList)
         market.get("global", use: self.fetchGlobalMetrics)
         market.get("trending", use: self.fetchTrendingCoins)
+        market.get("coin", ":id", use: self.fetchCoinMetadata)
     }
     
     // MARK: - Sendable Methods
@@ -63,6 +74,7 @@ struct MarketController: RouteCollection {
         return try await fetchAndCache(
             req: req,
             key: .topList,
+            id: nil,
             currency: currency,
             responseType: [TokenListDTO].self
         )
@@ -73,6 +85,7 @@ struct MarketController: RouteCollection {
         return try await fetchAndCache(
             req: req,
             key: .globalMetrics,
+            id: nil,
             currency: nil,
             responseType: GlobalMetricsDataDTO.self
         )
@@ -86,8 +99,27 @@ struct MarketController: RouteCollection {
         return try await fetchAndCache(
             req: req,
             key: .trendingCoins,
+            id: nil,
             currency: currency,
             responseType: TrendingCoinsProviderDTO.self)
+    }
+    
+    @Sendable
+    func fetchCoinMetadata(req: Request) async throws -> CoinMetadataDTO {
+        let reqCurrency = try? req.query.get(String.self, at: "vs_currency")
+        let currency = reqCurrency ?? "usd"
+        
+        guard let coinId = req.parameters.get("id") else {
+            throw Abort(.badRequest)
+        }
+        
+        return try await fetchAndCache(
+            req: req,
+            key: .coinMetadata,
+            id: coinId,
+            currency: currency,
+            responseType: CoinMetadataDTO.self
+        )
     }
     
     // MARK: - Private Methods
@@ -95,11 +127,13 @@ struct MarketController: RouteCollection {
     private func fetchAndCache<T: Content>(
         req: Request,
         key: RequestConstants.Keys,
+        id: String?,
         currency: String?,
         responseType: T.Type
     ) async throws -> T {
         let currencyValue = currency != nil ? currency : ""
-        let cacheKey = "\(key.id)_" + String(describing: currencyValue)
+        let idValue = id != nil ? id : ""
+        let cacheKey = "\(key.id)_" + String(describing: idValue) + "_" + String(describing: currencyValue)
         
         if let cachedData = try await req.cache.get(cacheKey, as: T.self) {
             req.logger.info("Getting from cache: \(key.id)")
@@ -113,9 +147,11 @@ struct MarketController: RouteCollection {
             headers.add(name: RequestConstants.apiHeader, value: apiKey)
         }
         
-        let url = RequestConstants.url(for: key, currency: currency)
+        let url = RequestConstants.url(for: key, id: id, currency: currency)
+        
         req.logger.info("URL: \(url)")
         req.logger.info("Header: \(headers)")
+        
         let response = try await req.client.get(URI(string: url), headers: headers)
         
         guard response.status == .ok else {
