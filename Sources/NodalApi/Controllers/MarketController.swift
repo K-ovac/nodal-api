@@ -35,9 +35,9 @@ private enum RequestConstants {
     static func url(for key: Keys, currency: String? = nil) -> String {
         var url = baseUrl + key.endpoint
         
-        guard let currency else { return "usd" }
+        guard let currency = currency, !currency.isEmpty else { return url }
         let separator = url.contains("?") ? "&" : "?"
-        url += "\(separator)vs_currency\(currency)"
+        url += "\(separator)vs_currency=\(currency)"
         
         return url
     }
@@ -107,11 +107,15 @@ struct MarketController: RouteCollection {
         }
         
         var headers = HTTPHeaders()
-        if let apiKey = RequestConstants.apiKey {
+        headers.add(name: "Accept", value: "application/json")
+        headers.add(name: "User-Agent", value: "NodalBackend/1.0")
+        if let apiKey = RequestConstants.apiKey, !apiKey.isEmpty {
             headers.add(name: RequestConstants.apiHeader, value: apiKey)
         }
         
         let url = RequestConstants.url(for: key, currency: currency)
+        req.logger.info("URL: \(url)")
+        req.logger.info("Header: \(headers)")
         let response = try await req.client.get(URI(string: url), headers: headers)
         
         guard response.status == .ok else {
@@ -124,15 +128,22 @@ struct MarketController: RouteCollection {
             throw Abort(.internalServerError, reason: "Failed to retrieve data from the server \(RequestConstants.aggName)")
         }
         
-        let decodedData = try response.content.decode(T.self)
+        do {
+            let decodedData = try response.content.decode(T.self)
+            
+            try await req.cache.set(
+                cacheKey,
+                to: decodedData,
+                expiresIn: .seconds(RequestConstants.expiresIn)
+            )
+            
+            req.logger.info("Data downloaded from the API and cached: \(key.id)")
+            return decodedData
+            
+        } catch {
+            req.logger.error("Error decoding JSON for \(cacheKey): \(error)")
+            throw Abort(.internalServerError, reason: "Data parsing error: \(error.localizedDescription)")
+        }
         
-        try await req.cache.set(
-            cacheKey,
-            to: decodedData,
-            expiresIn: .seconds(RequestConstants.expiresIn)
-        )
-        
-        req.logger.info("Data downloaded from the API and cached: \(key.id)")
-        return decodedData
     }
 }
