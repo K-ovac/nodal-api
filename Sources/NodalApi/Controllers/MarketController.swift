@@ -57,7 +57,9 @@ private enum RequestConstants {
 
 struct MarketController: RouteCollection {
     func boot(routes: any Vapor.RoutesBuilder) throws {
-        let market = routes.grouped("api", "market")
+        let protectedRoutes = routes.grouped(ApiKeyMiddleware())
+        let market = protectedRoutes.grouped("api", "market")
+        
         market.get("top", use: self.fetchTopList)
         market.get("global", use: self.fetchGlobalMetrics)
         market.get("trending", use: self.fetchTrendingCoins)

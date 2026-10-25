@@ -12,7 +12,8 @@ import Vapor
 
 struct UserController: RouteCollection {
     func boot(routes: any RoutesBuilder) throws {
-        let user = routes.grouped("users")
+        let protectedRoutes = routes.grouped(ApiKeyMiddleware())
+        let user = protectedRoutes.grouped("users")
         
         user.post(use: self.create)
         user.get(":username", use: self.getUser)
