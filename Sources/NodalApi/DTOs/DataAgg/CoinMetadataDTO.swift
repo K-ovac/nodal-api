@@ -60,6 +60,7 @@ struct CoinMarketDataDTO: Content {
     let price_change_percentage_1y: Double?
     let market_cap_change_24h: Double?
     let market_cap_change_percentage_24h: Double?
+    let market_cap_fdv_ratio: Double?
 }
 
 struct CoinCurrentPrice: Content {
