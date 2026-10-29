@@ -13,7 +13,7 @@ import Vapor
 struct WatchlistCoinsController: RouteCollection {
     func boot(routes: any Vapor.RoutesBuilder) throws {
         let protectedRoutes = routes.grouped(ApiKeyMiddleware())
-        let watchlistCoins = protectedRoutes.grouped("watchlist")
+        let watchlistCoins = protectedRoutes.grouped("api", "watchlist")
         let basicMW = User.authenticator()
         let guardMW = User.guardMiddleware()
         let protected = watchlistCoins.grouped(basicMW, guardMW)
